@@ -27,6 +27,7 @@
   --panel:#6d8dff; --panel-ink:#071033; --leaf:#3fd39a; --ok:#3fd39a; --warn:#ffb547; --bad:#ff7b6b;
   --ok-bg:#12352a; --warn-bg:#3a2b0e; --bad-bg:#3d1a17; --hero:#13286e; --hero2:#1f45c4; --sys-bg:#18307f; --sys-ink:#eef3fb; color-scheme:dark}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5}
 .mono,.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
 
@@ -143,7 +144,7 @@ footer{color:var(--muted);font-size:.82rem;text-align:center;display:flex;flex-d
 @media print{
   @page{margin:12mm}
   body{background:#fff!important}
-  .hero,.wrap>*:not(#sheetCard),#sheetCard>*:not(.sheet){display:none!important}
+  .hero,.wrap>*:not(#sheetCard),#sheetCard>*:not(#sheetBox),#sheetBox>*:not(.sheet){display:none!important}
   .wrap{margin:0;padding:0;max-width:none}
   #sheetCard{border:0;padding:0;background:#fff}
   .sheet{border:0;box-shadow:none;padding:0;font-size:9.5pt}
@@ -168,7 +169,7 @@ footer{color:var(--muted);font-size:.82rem;text-align:center;display:flex;flex-d
 <main class="wrap">
   <section class="card" aria-labelledby="h-app">
     <h2 id="h-app"><span class="step">1</span>What do you want to power?</h2>
-    <p class="sub" id="appSub">Start with what you can't live without. <span class="tag" id="sampleTag">Example home</span></p>
+    <p class="sub" id="appSub">Tap the appliances below to add them, starting with what you can't live without. <span class="tag" id="sampleTag" hidden>Example</span></p>
     <div class="row2" style="margin-bottom:14px">
       <label for="mode" style="grid-column:span 2">What are you powering?
         <select id="mode">
@@ -180,7 +181,10 @@ footer{color:var(--muted);font-size:.82rem;text-align:center;display:flex;flex-d
     </div>
     <ul class="alist" id="alist"></ul>
     <div id="chips" aria-label="Add an appliance"></div>
-    <button type="button" class="chip" id="clearAll" style="margin-top:12px;border-style:solid;color:var(--muted);border-color:var(--line)">Clear list and start my own</button>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+      <button type="button" class="chip" id="exampleBtn" style="border-style:solid">See an example</button>
+      <button type="button" class="chip" id="clearAll" style="border-style:solid;color:var(--muted);border-color:var(--line)">Clear list</button>
+    </div>
   </section>
 
   <section class="card" aria-labelledby="h-where">
@@ -256,9 +260,9 @@ footer{color:var(--muted);font-size:.82rem;text-align:center;display:flex;flex-d
     <h2 id="h-pay"><span class="step">4</span>Is it worth it?</h2>
     <p class="sub">What you spend on power today, against the system above.</p>
     <div class="row2">
-      <label for="genL"><span id="genLab">Generator petrol per day (litres)</span><input id="genL" type="number" inputmode="decimal" min="0" step="0.5" value="4"></label>
+      <label for="genL"><span id="genLab">Generator petrol per day (litres)</span><input id="genL" type="number" inputmode="decimal" min="0" step="0.5" placeholder="e.g. 4"></label>
       <label for="fuelP">Fuel price (₦/litre)<input id="fuelP" type="number" inputmode="numeric" min="0" step="10" value="1400"></label>
-      <label for="gridM">NEPA/grid bill per month (₦)<input id="gridM" type="number" inputmode="numeric" min="0" step="1000" value="25000"></label>
+      <label for="gridM">NEPA/grid bill per month (₦)<input id="gridM" type="number" inputmode="numeric" min="0" step="1000" placeholder="e.g. 25000"></label>
     </div>
     <div class="pay">
       <div class="stat"><div class="k">You spend now</div><div class="v" id="pNow">–</div><div class="sub" style="margin:0">per month, incl. generator servicing</div></div>
@@ -271,6 +275,9 @@ footer{color:var(--muted);font-size:.82rem;text-align:center;display:flex;flex-d
   <section class="card" id="sheetCard" aria-labelledby="h-sheet">
     <h2 id="h-sheet"><span class="step">5</span>Your plan sheet</h2>
     <p class="sub">A one-page summary to print, save as PDF, or send to family, your pastor or an installer.</p>
+    <button type="button" class="btn" id="showSheet">Get my plan sheet</button>
+    <p class="copied" id="sheetMsg" role="status" style="margin:10px 0 0;color:var(--warn)"></p>
+    <div id="sheetBox" hidden>
     <div class="actions">
       <button type="button" class="btn" id="printBtn">Print or save PDF</button>
       <a class="btn wa" id="waBtn" href="#" target="_blank" rel="noopener">Send on WhatsApp</a>
@@ -278,6 +285,7 @@ footer{color:var(--muted);font-size:.82rem;text-align:center;display:flex;flex-d
     </div>
     <p class="copied" id="copied" role="status"></p>
     <article class="sheet" id="sheet"></article>
+    </div>
   </section>
 
   <section class="card">
@@ -355,15 +363,14 @@ const num = v => { const x = parseFloat(String(v).replace(/[^0-9.]/g,'')); retur
 function save(){ try { localStorage.setItem(STORE, JSON.stringify({items, sample: !$('sampleTag').hidden, mode: $('mode').value, days: $('days').value})); } catch(e){} }
 function sampleFor(m){ const it = (m === 'church' ? SAMPLE_C : SAMPLE).map(n => ({...PRESETS.find(p => p.n === n)})); if (m !== 'church'){ it[0].q = 8; it[1].q = 3; } return it; }
 function load(){
-  try { const s = JSON.parse(localStorage.getItem(STORE)); if (s && Array.isArray(s.items)) { items = s.items; $('sampleTag').hidden = !s.sample; if (s.mode) $('mode').value = s.mode; if (s.days) $('days').value = s.days; applyMode(false); return; } } catch(e){}
-  items = sampleFor('home');
+  items = []; $('sampleTag').hidden = true; applyMode(false);
 }
 
 function renderList(){
   const ul = $('alist'); ul.textContent = '';
   if (!items.length){
     const li = document.createElement('li'); li.className = 'sub'; li.style.margin = '0';
-    li.textContent = 'Your list is empty. Tap an appliance below to add it.'; ul.append(li);
+    li.textContent = 'Nothing added yet. Tap an appliance below, then set how many and for how long.'; ul.append(li);
   }
   items.forEach((it, i) => {
     const li = document.createElement('li'); li.className = 'arow';
@@ -406,6 +413,7 @@ function renderChips(){
   });
 }
 $('clearAll').onclick = () => { items = []; markEdited(); renderList(); compute(); };
+$('exampleBtn').onclick = () => { items = sampleFor($('mode').value); renderList(); compute(); $('sampleTag').hidden = false; };
 
 /* ---------- sizing ---------- */
 function size(){
@@ -551,9 +559,9 @@ function paybackCore(){
   const service = num($('genL').value) > 0 ? 15000 : 0;
   const grid = num($('gridM').value);
   const now = fuel + service + grid;
-  $('pNow').textContent = naira(now); window.__pay = {now};
+  $('pNow').textContent = now > 0 ? naira(now) : '–'; window.__pay = now > 0 ? {now} : null;
   const ch = $('chart'); ch.textContent = '';
-  if (!s || !s.total || !items.length){ $('pBack').textContent = '–'; $('pBackD').textContent = ''; return; }
+  if (!s || !s.total || !items.length || now <= 0){ $('pBack').textContent = '–'; $('pBackD').textContent = ''; return; }
   const saving = fuel + service + grid * 0.7;
   const solarMonthly = grid * 0.3 + (s.lith ? 0 : s.batCost / 30); // tubular: replacement every ~30 months
   const net = now - solarMonthly;
@@ -650,6 +658,12 @@ function renderSheet(){
   $('waBtn').href = 'https://wa.me/?text=' + encodeURIComponent(summaryText());
 }
 $('printBtn').onclick = () => { renderSheet(); window.print(); };
+$('showSheet').onclick = () => {
+  const s = window.__plan;
+  if (!items.length || !s || !s.total){ $('sheetMsg').textContent = 'Add at least one appliance in step 1 first.'; return; }
+  $('sheetMsg').textContent = ''; renderSheet(); $('sheetBox').hidden = false; $('showSheet').hidden = true;
+  $('sheetBox').scrollIntoView({behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start'});
+};
 if (inFrame) { $('printBtn').hidden = true; }
 $('copyBtn').onclick = async () => {
   const txt = summaryText();
@@ -664,9 +678,7 @@ function applyMode(fromUser){
   $('genLab').textContent = church ? 'Generator fuel per week (litres)' : 'Generator petrol per day (litres)';
   if (fromUser){
     if (!$('sampleTag').hidden) { items = sampleFor(church ? 'church' : 'home'); renderList(); }
-    const g = $('genL'), gm = $('gridM');
-    if (church && g.value === '4') g.value = '50'; else if (!church && g.value === '50') g.value = '4';
-    if (church && gm.value === '25000') gm.value = '40000'; else if (!church && gm.value === '40000') gm.value = '25000';
+    $('genL').placeholder = church ? 'e.g. 50' : 'e.g. 4'; $('gridM').placeholder = church ? 'e.g. 40000' : 'e.g. 25000';
     save();
   }
   renderChips();
