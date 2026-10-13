@@ -1,0 +1,683 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1f45c4">
+<title>Solar Power Planner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: one phone-first column. Sky hero with sun-arc; appliance list; a "system card" result like a spec sheet; then quote check and payback. */
+:root{
+  --bg:#eef3fb; --surface:#ffffff; --ink:#0f1a33; --muted:#5a6785; --line:#d8e0ee;
+  --panel:#1f45c4; --panel-ink:#ffffff; --sun:#ffbf1f; --sun-ink:#2b1d00; --leaf:#0e8a5f;
+  --ok:#0e8a5f; --warn:#b86e00; --bad:#c23324; --ok-bg:#e3f5ec; --warn-bg:#fff2d9; --bad-bg:#fde6e3;
+  --hero:#1f45c4; --hero2:#3c6cf0; --hero-ink:#ffffff; --sys-bg:#0f1a33; --sys-ink:#eef3fb;
+  --display:"Unbounded",ui-sans-serif,system-ui,sans-serif;
+  --body:"Instrument Sans",ui-sans-serif,system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0b1222; --surface:#141d33; --ink:#eaf0ff; --muted:#a0acc8; --line:#25324f;
+  --panel:#6d8dff; --panel-ink:#071033; --leaf:#3fd39a; --ok:#3fd39a; --warn:#ffb547; --bad:#ff7b6b;
+  --ok-bg:#12352a; --warn-bg:#3a2b0e; --bad-bg:#3d1a17; --hero:#13286e; --hero2:#1f45c4; --sys-bg:#18307f; --sys-ink:#eef3fb; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0b1222; --surface:#141d33; --ink:#eaf0ff; --muted:#a0acc8; --line:#25324f;
+  --panel:#6d8dff; --panel-ink:#071033; --leaf:#3fd39a; --ok:#3fd39a; --warn:#ffb547; --bad:#ff7b6b;
+  --ok-bg:#12352a; --warn-bg:#3a2b0e; --bad-bg:#3d1a17; --hero:#13286e; --hero2:#1f45c4; --sys-bg:#18307f; --sys-ink:#eef3fb; color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5}
+.mono,.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+.hero{position:relative;overflow:hidden;background:linear-gradient(160deg,var(--hero) 0%,var(--hero2) 100%);color:var(--hero-ink);padding-inline:16px;padding-block:calc(26px + env(safe-area-inset-top,0px)) 70px}
+.hero::before{content:"";position:absolute;width:260px;height:260px;right:-60px;top:-80px;border-radius:50%;background:radial-gradient(circle,var(--sun) 0 38%,rgba(255,191,31,.35) 39% 52%,rgba(255,191,31,.12) 53% 66%,transparent 67%)}
+.hero::after{content:"";position:absolute;left:0;right:0;bottom:0;height:46px;background:
+  repeating-linear-gradient(90deg,rgba(255,255,255,.22) 0 1px,transparent 1px 36px),
+  repeating-linear-gradient(0deg,rgba(255,255,255,.22) 0 1px,transparent 1px 15px),
+  #0d2a85;transform:perspective(220px) rotateX(38deg);transform-origin:bottom}
+.hero-in{position:relative;max-width:640px;margin:0 auto}
+.eyebrow{font-size:.75rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;opacity:.85;margin:0 0 8px}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(1.9rem,7vw,2.6rem);line-height:1.05;margin:0;max-width:12ch;text-wrap:balance}
+.lede{margin:12px 0 0;max-width:46ch;font-size:1.02rem;opacity:.95}
+
+.wrap{max-width:640px;margin:-28px auto 0;position:relative;padding-inline:16px;padding-block:0 56px;display:flex;flex-direction:column;gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px}
+h2{font-family:var(--display);font-weight:500;font-size:1.1rem;margin:0;display:flex;align-items:center;gap:10px;text-wrap:balance}
+.step{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:8px;background:var(--panel);color:var(--panel-ink);font-family:var(--mono);font-size:.85rem;flex:none}
+.sub{color:var(--muted);font-size:.92rem;margin:6px 0 14px}
+.tag{font-size:.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--warn);background:var(--warn-bg);padding:2px 8px;border-radius:999px;white-space:nowrap}
+
+/* appliance rows */
+.alist{display:flex;flex-direction:column;gap:10px;list-style:none;margin:0;padding:0}
+.arow{display:grid;grid-template-columns:1fr auto;gap:8px 10px;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--bg)}
+.arow .nm{font-weight:600;min-width:0;overflow-wrap:anywhere;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.arow .heavy{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--bad);background:var(--bad-bg);padding:1px 6px;border-radius:999px}
+.arow .del{appearance:none;border:0;background:transparent;color:var(--muted);font-size:1.3rem;line-height:1;cursor:pointer;padding:0 4px;border-radius:6px}
+.fields{grid-column:1/-1;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.fields label{white-space:nowrap;display:flex;flex-direction:column;gap:2px;font-size:.7rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;min-width:0}
+input,select{font:inherit;font-family:var(--mono);font-size:.95rem;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 10px;width:100%;min-width:0}
+input:focus,select:focus,button:focus-visible{outline:3px solid var(--sun);outline-offset:1px}
+.arow .wh{grid-column:1/-1;font-size:.8rem;color:var(--muted)}
+.fields input{padding:7px 8px}
+.fields label{font-size:.66rem}
+
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.chiphead{font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:16px 0 0}
+.chip{appearance:none;border:1px dashed var(--panel);background:transparent;color:var(--panel);font:inherit;font-weight:600;font-size:.85rem;padding:6px 12px;border-radius:999px;cursor:pointer}
+.chip:hover{background:color-mix(in srgb,var(--panel) 10%,transparent)}
+.row2{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+@media (max-width:520px){.row2{grid-template-columns:1fr}}
+.row2 label{display:flex;flex-direction:column;gap:4px;font-size:.8rem;font-weight:600;color:var(--muted)}
+.row2 select,.row2 input{font-family:var(--body)}
+
+/* system card */
+.system{background:var(--sys-bg);color:var(--sys-ink);border:0;position:relative;overflow:hidden}
+.system h2{color:var(--sys-ink)}
+.system .sub{color:color-mix(in srgb,var(--sys-ink) 70%,transparent)}
+.specs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:6px}
+@media (max-width:460px){.specs{grid-template-columns:1fr}}
+.spec{border-radius:14px;padding:14px;background:color-mix(in srgb,var(--sys-ink) 9%,transparent);border:1px solid color-mix(in srgb,var(--sys-ink) 16%,transparent);display:flex;flex-direction:column;gap:2px;min-width:0}
+.spec .k{font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--sun)}
+.spec .v{font-family:var(--display);font-weight:700;font-size:1.7rem;line-height:1.15}
+.spec .d{font-size:.82rem;opacity:.8}
+.cost{margin-top:12px;display:flex;justify-content:space-between;align-items:baseline;gap:8px 14px;flex-wrap:wrap;border-top:1px dashed color-mix(in srgb,var(--sys-ink) 25%,transparent);padding-top:12px}
+.cost .v{font-family:var(--display);font-weight:700;font-size:1.35rem;color:var(--sun)}
+.energy{margin-top:14px}
+.ebar{display:flex;height:14px;border-radius:7px;overflow:hidden;background:color-mix(in srgb,var(--sys-ink) 15%,transparent)}
+.ebar .day{background:var(--sun)} .ebar .night{background:#7f9bff}
+.elegend{display:flex;gap:14px;flex-wrap:wrap;font-size:.82rem;margin-top:6px;opacity:.9}
+.elegend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.notes{margin:12px 0 0;padding-left:1.1em;font-size:.86rem;display:flex;flex-direction:column;gap:4px;opacity:.92}
+
+/* quote checker */
+.qgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.qgrid label{display:flex;flex-direction:column;gap:4px;font-size:.8rem;font-weight:600;color:var(--muted);min-width:0}
+.qgrid .full{grid-column:1/-1}
+@media (max-width:420px){.qgrid{grid-template-columns:1fr}}
+.btn{appearance:none;border:0;border-radius:12px;padding:13px 18px;font:inherit;font-weight:700;font-size:1rem;cursor:pointer;background:var(--panel);color:var(--panel-ink);width:100%;margin-top:12px}
+.verdicts{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+.verdict{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;padding:10px 12px;border-radius:12px;font-size:.92rem}
+.verdict b{display:block}
+.verdict .dot{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:.8rem;color:#fff;margin-top:1px}
+.v-ok{background:var(--ok-bg)} .v-ok .dot{background:var(--ok)}
+.v-warn{background:var(--warn-bg)} .v-warn .dot{background:var(--warn)}
+.v-bad{background:var(--bad-bg)} .v-bad .dot{background:var(--bad)}
+.asks{margin:14px 0 0;padding-left:1.2em;font-size:.9rem;display:flex;flex-direction:column;gap:4px}
+
+/* payback */
+.pay{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}
+@media (max-width:420px){.pay{grid-template-columns:1fr}}
+.stat{border:1px solid var(--line);border-radius:14px;padding:12px;background:var(--bg)}
+.stat .k{font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.stat .v{font-family:var(--display);font-weight:700;font-size:1.3rem}
+.chart{margin-top:14px}
+.chart svg{width:100%;height:auto;display:block}
+details{border-top:1px solid var(--line);padding-top:10px;margin-top:4px}
+summary{cursor:pointer;font-weight:600;color:var(--panel)}
+footer{color:var(--muted);font-size:.82rem;text-align:center;display:flex;flex-direction:column;gap:4px}
+/* plan sheet */
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.actions .btn{width:auto;flex:1 1 150px;margin:0;display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;font-size:.95rem;padding:12px 14px}
+.btn.wa{background:#1da851;color:#fff}
+.btn.ghost{background:transparent;color:var(--panel);box-shadow:inset 0 0 0 2px var(--panel)}
+.sheet{background:#fff;color:#0f1a33;border:1px solid var(--line);border-radius:12px;padding:18px;font-size:.9rem;box-shadow:0 6px 20px rgba(15,26,51,.08)}
+.sheet h3{font-family:var(--display);font-weight:700;font-size:1.15rem;margin:0}
+.sheet .meta{color:#5a6785;font-size:.8rem;margin:2px 0 12px}
+.sheet h4{font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#1f45c4;margin:16px 0 6px}
+.sheet .tbl{overflow-x:auto}
+.sheet table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.sheet th,.sheet td{text-align:left;padding:5px 6px;border-bottom:1px solid #e3e8f2;white-space:nowrap}
+.sheet th{font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;color:#5a6785}
+.sheet td.n,.sheet th.n{text-align:right}
+.sheet tfoot td{font-weight:700;border-bottom:0}
+.sheet .sys{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+@media (max-width:460px){.sheet .sys{grid-template-columns:1fr}}
+.sheet .sys div{border:1px solid #d8e0ee;border-radius:10px;padding:8px 10px}
+.sheet .sys b{display:block;font-family:var(--display);font-size:1.05rem}
+.sheet .sys span{font-size:.72rem;color:#5a6785;text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+.sheet .price{margin-top:8px;font-weight:700}
+.sheet ul,.sheet ol{margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:3px}
+.sheet .foot{margin-top:16px;padding-top:10px;border-top:1px dashed #d8e0ee;color:#5a6785;font-size:.75rem}
+.copied{font-size:.85rem;color:var(--ok);min-height:1.2em;margin:-6px 0 10px}
+@media print{
+  @page{margin:12mm}
+  body{background:#fff!important}
+  .hero,.wrap>*:not(#sheetCard),#sheetCard>*:not(.sheet){display:none!important}
+  .wrap{margin:0;padding:0;max-width:none}
+  #sheetCard{border:0;padding:0;background:#fff}
+  .sheet{border:0;box-shadow:none;padding:0;font-size:9.5pt}
+  .sheet h4{margin:10px 0 4px}
+  .sheet th,.sheet td{padding:3px 6px}
+  .sheet .meta{margin-bottom:6px}
+  .sheet .tbl{overflow:visible}
+}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="hero-in">
+    <p class="eyebrow">For Nigerian homes, shops &amp; churches</p>
+    <h1>Solar Power Planner</h1>
+    <p class="lede">List what you want to power. See the right inverter, battery and panels, what it should cost, and whether an installer's quote makes sense.</p>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="card" aria-labelledby="h-app">
+    <h2 id="h-app"><span class="step">1</span>What do you want to power?</h2>
+    <p class="sub" id="appSub">Start with what you can't live without. <span class="tag" id="sampleTag">Example home</span></p>
+    <div class="row2" style="margin-bottom:14px">
+      <label for="mode" style="grid-column:span 2">What are you powering?
+        <select id="mode">
+          <option value="home">Home or shop (used every day)</option>
+          <option value="church">Church, auditorium or event hall</option>
+        </select>
+      </label>
+      <label for="days" id="daysWrap" hidden>Service days per week<input id="days" type="number" inputmode="numeric" min="1" max="7" step="1" value="3"></label>
+    </div>
+    <ul class="alist" id="alist"></ul>
+    <div id="chips" aria-label="Add an appliance"></div>
+    <button type="button" class="chip" id="clearAll" style="margin-top:12px;border-style:solid;color:var(--muted);border-color:var(--line)">Clear list and start my own</button>
+  </section>
+
+  <section class="card" aria-labelledby="h-where">
+    <h2 id="h-where"><span class="step">2</span>Your situation</h2>
+    <p class="sub">Sunshine differs across Nigeria, and battery type changes everything.</p>
+    <div class="row2">
+      <label for="region">Where you live
+        <select id="region">
+          <option value="4.4">South / coastal (Lagos, PH, Calabar)</option>
+          <option value="5.0">South-West inland, South-East, Middle Belt</option>
+          <option value="5.6">North (Kano, Kaduna, Sokoto…)</option>
+        </select>
+      </label>
+      <label for="btype">Battery type
+        <select id="btype">
+          <option value="lithium">Lithium (LiFePO4)</option>
+          <option value="tubular">Tubular / lead-acid</option>
+        </select>
+      </label>
+      <label for="backup">Battery backup
+        <select id="backup">
+          <option value="1">Standard</option>
+          <option value="1.5">Extra buffer for cloudy days</option>
+        </select>
+      </label>
+    </div>
+  </section>
+
+  <section class="card system" aria-labelledby="h-sys" id="system">
+    <h2 id="h-sys">Your system</h2>
+    <p class="sub" id="sysSub">Sized so you don't need the generator.</p>
+    <div class="specs">
+      <div class="spec"><span class="k">Inverter</span><span class="v" id="sInv">–</span><span class="d" id="sInvD"></span></div>
+      <div class="spec"><span class="k">Battery</span><span class="v" id="sBat">–</span><span class="d" id="sBatD"></span></div>
+      <div class="spec"><span class="k">Solar panels</span><span class="v" id="sPan">–</span><span class="d" id="sPanD"></span></div>
+    </div>
+    <div class="cost"><span>Fair price, installed</span><span class="v" id="sCost">–</span></div>
+    <div class="energy">
+      <div class="ebar" aria-hidden="true"><div class="day" id="eDay"></div><div class="night" id="eNight"></div></div>
+      <div class="elegend"><span><i style="background:var(--sun)"></i><span id="lDay"></span></span><span><i style="background:#7f9bff"></i><span id="lNight"></span></span></div>
+    </div>
+    <ul class="notes" id="sNotes"></ul>
+  </section>
+
+  <section class="card" aria-labelledby="h-quote">
+    <h2 id="h-quote"><span class="step">3</span>Check an installer's quote</h2>
+    <p class="sub">Copy the numbers from the quote. We compare them with what your home needs and what the market charges.</p>
+    <div class="qgrid">
+      <label for="qInv">Inverter size (kVA)<input id="qInv" type="number" inputmode="decimal" min="0" step="0.5" placeholder="e.g. 3.5"></label>
+      <label for="qBtype">Battery type
+        <select id="qBtype"><option value="lithium">Lithium</option><option value="tubular">Tubular / lead-acid</option></select>
+      </label>
+      <label for="qBat" id="qBatLabel">Battery size (kWh)<input id="qBat" type="number" inputmode="decimal" min="0" step="0.5" placeholder="e.g. 5"></label>
+      <label for="qPanN">Number of panels<input id="qPanN" type="number" inputmode="numeric" min="0" step="1" placeholder="e.g. 4"></label>
+      <label for="qPanW">Watts per panel<input id="qPanW" type="number" inputmode="numeric" min="0" step="10" placeholder="e.g. 550"></label>
+      <label for="qPrice">Total price (₦)<input id="qPrice" type="text" inputmode="numeric" placeholder="e.g. 2,800,000"></label>
+    </div>
+    <button type="button" class="btn" id="qGo">Check this quote</button>
+    <ul class="verdicts" id="verdicts"></ul>
+    <div id="asksBox" hidden>
+      <p style="margin:16px 0 0;font-weight:700">Ask the installer before you pay</p>
+      <ol class="asks">
+        <li>Battery brand, model and cycle rating. Good LiFePO4 is rated 4,000+ cycles.</li>
+        <li>Is the battery new? Ask for the serial number and the warranty card.</li>
+        <li>Panel brand and wattage printed on the back label, not just the box.</li>
+        <li>Warranty in writing: inverter, battery and workmanship, and who to call.</li>
+        <li>An itemised quote: cables, breakers, surge protection, earthing, mounting and labour.</li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="h-pay">
+    <h2 id="h-pay"><span class="step">4</span>Is it worth it?</h2>
+    <p class="sub">What you spend on power today, against the system above.</p>
+    <div class="row2">
+      <label for="genL"><span id="genLab">Generator petrol per day (litres)</span><input id="genL" type="number" inputmode="decimal" min="0" step="0.5" value="4"></label>
+      <label for="fuelP">Fuel price (₦/litre)<input id="fuelP" type="number" inputmode="numeric" min="0" step="10" value="1400"></label>
+      <label for="gridM">NEPA/grid bill per month (₦)<input id="gridM" type="number" inputmode="numeric" min="0" step="1000" value="25000"></label>
+    </div>
+    <div class="pay">
+      <div class="stat"><div class="k">You spend now</div><div class="v" id="pNow">–</div><div class="sub" style="margin:0">per month, incl. generator servicing</div></div>
+      <div class="stat"><div class="k">Solar pays for itself in</div><div class="v" id="pBack">–</div><div class="sub" style="margin:0" id="pBackD"></div></div>
+    </div>
+    <div class="chart" id="chart" aria-label="Five-year cost comparison"></div>
+    <p class="sub" style="margin:8px 0 0">Assumes solar replaces the generator fully and about 70% of your grid bill.</p>
+  </section>
+
+  <section class="card" id="sheetCard" aria-labelledby="h-sheet">
+    <h2 id="h-sheet"><span class="step">5</span>Your plan sheet</h2>
+    <p class="sub">A one-page summary to print, save as PDF, or send to family, your pastor or an installer.</p>
+    <div class="actions">
+      <button type="button" class="btn" id="printBtn">Print or save PDF</button>
+      <a class="btn wa" id="waBtn" href="#" target="_blank" rel="noopener">Send on WhatsApp</a>
+      <button type="button" class="btn ghost" id="copyBtn">Copy summary</button>
+    </div>
+    <p class="copied" id="copied" role="status"></p>
+    <article class="sheet" id="sheet"></article>
+  </section>
+
+  <section class="card">
+    <details>
+      <summary>Price settings (market prices, Oct 2026)</summary>
+      <p class="sub">Defaults are mid-market Lagos prices from October 2026. Update them as the market moves.</p>
+      <div class="qgrid">
+        <label for="prPanel">Solar panels (₦ per watt)<input id="prPanel" type="number" inputmode="numeric" value="250"></label>
+        <label for="prLith">Lithium battery (₦ per kWh)<input id="prLith" type="number" inputmode="numeric" value="220000"></label>
+        <label for="prTub">Tubular 200Ah battery (₦ each)<input id="prTub" type="number" inputmode="numeric" value="190000"></label>
+        <label for="prInst">Install &amp; accessories (% of equipment)<input id="prInst" type="number" inputmode="numeric" value="20"></label>
+      </div>
+    </details>
+  </section>
+
+  <footer>
+    <span>Estimates for planning only. Always get a site visit before you buy.</span>
+    <span>Your entries stay on this device.</span>
+  </footer>
+</main>
+
+<script>
+(function(){
+const $ = id => document.getElementById(id);
+const PRESETS = [
+  {n:'LED bulbs', w:10, q:6, d:1, ni:6},
+  {n:'Ceiling fan', w:75, q:2, d:6, ni:8},
+  {n:'Standing fan', w:60, q:1, d:6, ni:8},
+  {n:'TV (32–43")', w:80, q:1, d:4, ni:4},
+  {n:'TV (55"+)', w:150, q:1, d:4, ni:4},
+  {n:'Decoder', w:20, q:1, d:4, ni:4},
+  {n:'Wi-Fi router', w:10, q:1, d:11, ni:13},
+  {n:'Laptop', w:65, q:1, d:6, ni:2},
+  {n:'Desktop computer', w:200, q:1, d:6, ni:1},
+  {n:'Phone charging', w:10, q:3, d:2, ni:2},
+  {n:'Fridge', w:150, q:1, d:11, ni:13, duty:.4, motor:1},
+  {n:'Deep freezer', w:200, q:1, d:11, ni:13, duty:.5, motor:1},
+  {n:'Inverter AC (1HP)', w:900, q:1, d:0, ni:6, duty:.6, motor:1},
+  {n:'Non-inverter AC (1HP)', w:1100, q:1, d:0, ni:6, duty:.8, motor:1, heavy:1},
+  {n:'Pumping machine', w:750, q:1, d:.5, ni:0, motor:1},
+  {n:'Washing machine', w:500, q:1, d:1, ni:0, motor:1},
+  {n:'Blender', w:400, q:1, d:.2, ni:0, motor:1},
+  {n:'Microwave', w:1200, q:1, d:.3, ni:0, heavy:1},
+  {n:'Pressing iron', w:1200, q:1, d:.5, ni:0, heavy:1},
+  {n:'Electric kettle', w:2000, q:1, d:.2, ni:0, heavy:1},
+  {n:'Sound system', w:100, q:1, d:3, ni:2},
+  {n:'CCTV / security light', w:40, q:1, d:0, ni:12},
+  {n:'Panel / LED lights', w:20, q:20, d:4, ni:2, g:'c'},
+  {n:'Industrial ceiling fan', w:100, q:8, d:4, ni:2, g:'c'},
+  {n:'Power amplifier', w:1000, q:1, d:4, ni:2, duty:.5, g:'c'},
+  {n:'Active speaker', w:300, q:4, d:4, ni:2, duty:.4, g:'c'},
+  {n:'Stage monitor', w:150, q:2, d:4, ni:2, duty:.4, g:'c'},
+  {n:'Mixer / sound desk', w:50, q:1, d:4, ni:2, g:'c'},
+  {n:'Keyboard', w:50, q:2, d:4, ni:2, g:'c'},
+  {n:'Bass / guitar amp', w:100, q:1, d:4, ni:2, g:'c'},
+  {n:'Wireless mic set', w:20, q:2, d:4, ni:2, g:'c'},
+  {n:'Projector', w:300, q:1, d:4, ni:2, g:'c'},
+  {n:'Stage LED lights', w:50, q:6, d:2, ni:2, g:'c'},
+  {n:'LED screen (per m²)', w:200, q:6, d:4, ni:2, g:'c'},
+  {n:'Livestream camera & laptop', w:120, q:1, d:4, ni:2, g:'c'},
+  {n:'Standing AC (2HP inverter)', w:1800, q:2, d:4, ni:2, duty:.7, motor:1, heavy:1, g:'c'},
+];
+const SAMPLE = ['LED bulbs','Ceiling fan','TV (32–43")','Decoder','Wi-Fi router','Laptop','Fridge','Pumping machine'];
+const SAMPLE_C = ['Panel / LED lights','Industrial ceiling fan','Power amplifier','Active speaker','Mixer / sound desk','Keyboard','Wireless mic set','Projector','Stage LED lights','Livestream camera & laptop'];
+const INV = [ // kVA, mid price ₦
+  [1,180000],[1.5,260000],[2.5,330000],[3.5,400000],[5,520000],[7.5,850000],[10,1250000],[12,1600000],[15,2100000]];
+const STORE = 'solar-planner-v1';
+let items = [];
+
+const naira = n => '₦' + Math.round(n).toLocaleString('en-NG');
+const short = n => n >= 1e6 ? '₦' + (n/1e6).toFixed(n >= 1e7 ? 0 : 1).replace(/\.0$/,'') + 'm' : '₦' + Math.round(n/1000) + 'k';
+const roundTo = (n, s) => Math.round(n / s) * s;
+const num = v => { const x = parseFloat(String(v).replace(/[^0-9.]/g,'')); return isFinite(x) ? x : 0; };
+
+function save(){ try { localStorage.setItem(STORE, JSON.stringify({items, sample: !$('sampleTag').hidden, mode: $('mode').value, days: $('days').value})); } catch(e){} }
+function sampleFor(m){ const it = (m === 'church' ? SAMPLE_C : SAMPLE).map(n => ({...PRESETS.find(p => p.n === n)})); if (m !== 'church'){ it[0].q = 8; it[1].q = 3; } return it; }
+function load(){
+  try { const s = JSON.parse(localStorage.getItem(STORE)); if (s && Array.isArray(s.items)) { items = s.items; $('sampleTag').hidden = !s.sample; if (s.mode) $('mode').value = s.mode; if (s.days) $('days').value = s.days; applyMode(false); return; } } catch(e){}
+  items = sampleFor('home');
+}
+
+function renderList(){
+  const ul = $('alist'); ul.textContent = '';
+  if (!items.length){
+    const li = document.createElement('li'); li.className = 'sub'; li.style.margin = '0';
+    li.textContent = 'Your list is empty. Tap an appliance below to add it.'; ul.append(li);
+  }
+  items.forEach((it, i) => {
+    const li = document.createElement('li'); li.className = 'arow';
+    const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = it.n;
+    if (it.heavy){ const h = document.createElement('span'); h.className = 'heavy'; h.textContent = 'Heavy load'; nm.append(h); }
+    const del = document.createElement('button'); del.type = 'button'; del.className = 'del'; del.textContent = '×'; del.setAttribute('aria-label', 'Remove ' + it.n);
+    del.onclick = () => { items.splice(i,1); markEdited(); renderList(); compute(); };
+    const f = document.createElement('div'); f.className = 'fields';
+    const mk = (lab, key, step) => {
+      const l = document.createElement('label'); const id = 'f' + i + key; l.htmlFor = id; l.textContent = lab;
+      const inp = document.createElement('input'); inp.type = 'number'; inp.inputMode = 'decimal'; inp.min = '0'; inp.step = step; inp.id = id; inp.value = it[key];
+      inp.oninput = () => { it[key] = num(inp.value); markEdited(); compute(); wh.textContent = whText(it); };
+      l.append(inp); return l;
+    };
+    f.append(mk('Qty','q','1'), mk('Watts','w','5'), mk('Day hrs','d','0.5'), mk('Night hrs','ni','0.5'));
+    const wh = document.createElement('div'); wh.className = 'wh mono'; wh.textContent = whText(it);
+    li.append(nm, del, f, wh); ul.append(li);
+  });
+}
+function whText(it){
+  const e = it.w * it.q * (it.d + it.ni) * (it.duty || 1);
+  return (e >= 1000 ? (e/1000).toFixed(1) + ' kWh' : Math.round(e) + ' Wh') + ' a day' + (it.duty ? ' (runs on and off)' : '');
+}
+function markEdited(){ $('sampleTag').hidden = true; save(); }
+
+function renderChips(){
+  const c = $('chips'); c.textContent = '';
+  const church = $('mode').value === 'church';
+  const groups = [['Church & hall', PRESETS.filter(p => p.g === 'c')], ['Home & shop', PRESETS.filter(p => !p.g)]];
+  if (!church) groups.reverse();
+  groups.forEach(([title, list]) => {
+    const h = document.createElement('p'); h.className = 'chiphead'; h.textContent = 'Add: ' + title; c.append(h);
+    const wrap = document.createElement('div'); wrap.className = 'chips';
+    list.forEach(p => {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = '+ ' + p.n;
+      b.onclick = () => { items.push({...p}); markEdited(); renderList(); compute(); };
+      wrap.append(b);
+    });
+    c.append(wrap);
+  });
+}
+$('clearAll').onclick = () => { items = []; markEdited(); renderList(); compute(); };
+
+/* ---------- sizing ---------- */
+function size(){
+  const psh = num($('region').value), lith = $('btype').value === 'lithium', backup = num($('backup').value);
+  const church = $('mode').value === 'church', days = Math.min(7, Math.max(1, num($('days').value) || 3));
+  let day = 0, night = 0, running = 0, motorMax = 0, heavy = [];
+  for (const it of items){
+    const duty = it.duty || 1;
+    day += it.w * it.q * it.d * duty; night += it.w * it.q * it.ni * duty;
+    if (it.q > 0 && (it.d + it.ni) > 0){ running += it.w * it.q; if (it.motor) motorMax = Math.max(motorMax, it.w); if (it.heavy) heavy.push(it.n); }
+  }
+  const total = day + night;
+  // Inverter: continuous capacity (kVA × 0.8 kW) must cover running load + 20%; surge (2×) must cover a motor starting (3× its watts).
+  const needCont = running * 1.2, needSurge = running - motorMax + motorMax * 3;
+  let inv = INV.find(([k]) => k * 800 >= needCont && k * 1600 >= needSurge);
+  let invLabel, invCost, invUnits = 1;
+  if (inv){ invLabel = inv[0] + ' kVA'; invCost = inv[1]; }
+  else { invUnits = Math.max(2, Math.ceil(needCont / 8000), Math.ceil(needSurge / 16000)); inv = [invUnits * 10, invUnits * 1250000]; invLabel = invUnits + ' × 10 kVA'; invCost = inv[1]; }
+  // Battery: energy it must supply (+ buffer) / inverter efficiency
+  // Church/hall: night portion plus half the daytime load (heavy service loads exceed what panels give in real time).
+  const usableNeed = (church ? night + day * 0.5 : night) * backup / 0.9; // Wh at battery
+  let batKWh, batLabel, batDetail, batCost;
+  const prL = num($('prLith').value) || 220000, prT = num($('prTub').value) || 190000;
+  if (lith){
+    batKWh = Math.max(2.5, Math.ceil(usableNeed / 0.9 / 2500) * 2.5);
+    batLabel = batKWh + ' kWh'; batDetail = 'Lithium, ' + (batKWh >= 5 ? '48V' : '24V');
+    batCost = batKWh * prL;
+  } else {
+    const volts = inv[0] >= 5 ? 48 : inv[0] >= 2.5 ? 24 : 12, per = volts / 12;
+    let n = Math.ceil(usableNeed / 0.5 / 2400 / per) * per; n = Math.max(per, n);
+    batKWh = n * 2.4; batLabel = n + ' × 200Ah'; batDetail = 'Tubular, ' + volts + 'V bank (' + (batKWh*0.5).toFixed(1) + ' kWh usable)';
+    batCost = n * prT;
+  }
+  // Panels: daily energy / (sun hours × 75% real-world output), 550W panels
+  // Panels must make, per day: home = whole day's use; church = weekly use spread over 7 days, but enough to refill the battery within 2 days and carry half the daytime load.
+  const genNeed = church ? Math.max(total * days / 7, usableNeed / 2, day * 0.5) : total;
+  const kWp = genNeed / 0.9 / (psh * 0.75) / 1000;
+  const panels = Math.max(1, Math.ceil(kWp * 1000 / 550));
+  const panelW = panels * 550;
+  const prP = num($('prPanel').value) || 250, inst = (num($('prInst').value) || 20) / 100;
+  const equip = invCost + batCost + panelW * prP;
+  const mid = equip * (1 + inst);
+  return { church, days, genNeed, invLabel, invUnits, day, night, total, running, motorMax, heavy, inv, batKWh, batLabel, batDetail, batCost, lith, panels, panelW, kWp, mid,
+    low: mid * 0.85, high: mid * 1.25, psh, needCont, needSurge, usableNeed };
+}
+
+function compute(){
+  const s = size(); window.__plan = s;
+  if (!items.length || s.total <= 0){
+    ['sInv','sBat','sPan','sCost'].forEach(id => $(id).textContent = '–');
+    ['sInvD','sBatD','sPanD','lDay','lNight'].forEach(id => $(id).textContent = '');
+    $('sNotes').textContent = ''; $('eDay').style.flex = '0'; $('eNight').style.flex = '0';
+    $('sysSub').textContent = 'Add appliances to see your system.'; payback(); return;
+  }
+  $('sysSub').textContent = s.church ? 'Sized to run your services without the generator.' : 'Sized so you don\'t need the generator.';
+  $('sInv').textContent = s.invLabel; $('sInvD').textContent = 'Hybrid · your load peaks near ' + (s.running/1000).toFixed(1) + ' kW';
+  $('sBat').textContent = s.batLabel; $('sBatD').textContent = s.batDetail;
+  $('sPan').textContent = s.panels + ' × 550W'; $('sPanD').textContent = (s.panelW/1000).toFixed(2).replace(/0$/,'') + ' kW of panels';
+  $('sCost').textContent = short(s.low) + ' – ' + short(s.high);
+  $('eDay').style.flex = String(s.day); $('eNight').style.flex = String(s.night);
+  const per = s.church ? ' per service day' : '';
+  $('lDay').textContent = 'Daytime ' + (s.day/1000).toFixed(1) + ' kWh' + per; $('lNight').textContent = 'Night ' + (s.night/1000).toFixed(1) + ' kWh' + per + ' (from battery)';
+  const notes = [];
+  if (s.heavy.length) notes.push(s.heavy.join(', ') + (s.heavy.length > 1 ? ' push' : ' pushes') + ' the size and cost up a lot. ' + (s.church ? 'Many churches run these on the generator or grid instead.' : 'Many homes keep these on the grid or generator instead.'));
+  if (s.invUnits > 1) notes.push('This load is bigger than one inverter. It needs ' + s.invUnits + ' inverters linked in parallel, or a 3-phase commercial system. Get an engineer to visit before buying.');
+  if (s.church){
+    notes.push('Panels charge the battery all week, so it is full for each service. The battery also helps carry the heavy load while the service is on.');
+    notes.push('Sound gear needs clean power. Modern hybrid inverters give pure sine wave power, which is safe for amplifiers and mixers. Avoid "modified sine" inverters.');
+    notes.push('Keep the generator for long vigils, crusades or big programmes beyond this plan.');
+  }
+  if (!s.lith) notes.push('Tubular batteries are cheaper now but usually need replacing every 2–3 years. Good lithium can last 8–10.');
+  if (s.motorMax) notes.push('Includes room for motors starting up, like fridges, pumps or ACs, which briefly draw about 3× their power.');
+  notes.push(s.church ? ('Use: ' + (s.total/1000).toFixed(1) + ' kWh per service day, ' + s.days + ' day' + (s.days > 1 ? 's' : '') + ' a week. Panels assume about ' + s.psh + ' hours of strong sun.')
+    : ('Total use: ' + (s.total/1000).toFixed(1) + ' kWh a day. Panels assume about ' + s.psh + ' hours of strong sun.'));
+  const ul = $('sNotes'); ul.textContent = ''; notes.forEach(t => { const li = document.createElement('li'); li.textContent = t; ul.append(li); });
+  payback();
+}
+
+/* ---------- quote checker ---------- */
+$('qBtype').onchange = () => { const t = $('qBtype').value === 'tubular'; $('qBatLabel').firstChild.textContent = t ? 'Number of 200Ah batteries' : 'Battery size (kWh)'; $('qBat').placeholder = t ? 'e.g. 4' : 'e.g. 5'; };
+$('qPrice').addEventListener('input', e => { const v = num(e.target.value); e.target.value = v ? Math.round(v).toLocaleString('en-NG') : ''; });
+$('qGo').onclick = () => {
+  const s = size(), out = $('verdicts'); out.textContent = '';
+  const qi = num($('qInv').value), tub = $('qBtype').value === 'tubular', qb = num($('qBat').value), qn = num($('qPanN').value), qw = num($('qPanW').value), qp = num($('qPrice').value);
+  const add = (cls, icon, title, text) => { const li = document.createElement('li'); li.className = 'verdict ' + cls; const d = document.createElement('span'); d.className = 'dot'; d.textContent = icon; const t = document.createElement('div'); const b = document.createElement('b'); b.textContent = title; t.append(b, document.createTextNode(text)); li.append(d, t); out.append(li); };
+  if (!qi && !qb && !qn && !qp){ add('v-warn','!','Nothing to check yet','Enter at least the inverter, battery, panels and price from the quote.'); return; }
+  if (!items.length){ add('v-warn','!','Add your appliances first','The check compares the quote with what your home needs.'); }
+  // Inverter
+  if (qi){
+    if (qi * 800 < s.needCont && s.invUnits > 1) add('v-bad','✕','Inverter too small', ` ${qi} kVA total can't carry about ${(s.running/1000).toFixed(1)} kW of equipment. This needs about ${s.invLabel} in parallel.`);
+    else if (qi * 800 < s.needCont) add('v-bad','✕','Inverter too small', ` ${qi} kVA can't carry your appliances running together (about ${(s.running/1000).toFixed(1)} kW). Expect overload trips.`);
+    else if (qi * 1600 < s.needSurge) add('v-warn','!','Inverter may trip on start-up', ` ${qi} kVA is tight when your fridge or pump starts. ${s.inv[0]} kVA is safer.`);
+    else add('v-ok','✓','Inverter size is fine', ` ${qi} kVA covers your load.`);
+  }
+  // Battery
+  let qUsable = 0, qBatCost = 0, qBatKWh = 0;
+  if (qb){
+    qBatKWh = tub ? qb * 2.4 : qb; qUsable = tub ? qBatKWh * 0.5 : qBatKWh * 0.9;
+    qBatCost = tub ? qb * (num($('prTub').value)||190000) : qb * (num($('prLith').value)||220000);
+    const needU = s.usableNeed / 1000, hours = s.night > 0 ? qUsable * 0.9 / (s.night / 13 / 1000) : 0;
+    const what = s.church ? 'each service' : 'your nights';
+    const runOut = s.church ? 'power may run out before the service ends.' : `power may run out around ${Math.min(12, Math.max(1, Math.round(hours)))} hours after sunset.`;
+    if (needU > 0 && qUsable < needU * 0.8) add('v-bad','✕','Battery too small', ` It stores about ${qUsable.toFixed(1)} kWh you can use. ${s.church ? 'Each service needs' : 'Your nights need'} about ${needU.toFixed(1)} kWh, so ${runOut}`);
+    else if (needU > 0 && qUsable < needU) add('v-warn','!','Battery a little small', ` About ${qUsable.toFixed(1)} kWh usable vs ${needU.toFixed(1)} kWh needed. Fine if you cut back a little.`);
+    else add('v-ok','✓','Battery size is fine', ` About ${qUsable.toFixed(1)} kWh usable covers ${what}.`);
+  }
+  // Panels
+  let qPanelW = 0;
+  if (qn && qw){
+    qPanelW = qn * qw;
+    const dailyGen = qPanelW * s.psh * 0.75 * 0.9;
+    if (qw > 750) add('v-warn','!','Check the panel wattage', ` ${qw}W per panel is unusual for homes. Confirm on the label on the back of the panel.`);
+    const need = s.genNeed, needTxt = s.church ? `Your plan needs about ${(need/1000).toFixed(1)} kWh a day to stay charged between services` : `You use ${(need/1000).toFixed(1)} kWh`;
+    if (dailyGen < need * 0.8) add('v-bad','✕','Not enough panels', ` ${qn} × ${qw}W makes about ${(dailyGen/1000).toFixed(1)} kWh on a sunny day. ${needTxt}, so the battery won't fully charge.`);
+    else if (dailyGen < need) add('v-warn','!','Panels slightly short', ` About ${(dailyGen/1000).toFixed(1)} kWh a day vs ${(need/1000).toFixed(1)} kWh needed. Cloudy days will hurt.`);
+    else add('v-ok','✓','Enough panels', ` About ${(dailyGen/1000).toFixed(1)} kWh on a sunny day covers the ${(need/1000).toFixed(1)} kWh needed.`);
+    if (qBatKWh && qPanelW < qUsable * 1000 / (s.psh * 0.75 * 0.9) * 0.6) add('v-warn','!','Big battery, few panels', ' The panels can\'t refill this battery in one day. Common in cheap packages.');
+  }
+  // Price
+  if (qp){
+    const invHit = INV.find(([k]) => k >= qi); const invP = invHit ? invHit[1] : Math.ceil(qi / 10) * 1250000;
+    const inst = (num($('prInst').value) || 20) / 100;
+    if (qi && qb && qPanelW){
+      const fair = (invP + qBatCost + qPanelW * (num($('prPanel').value)||250)) * (1 + inst);
+      const lo = fair * 0.85, hi = fair * 1.25;
+      if (qp > hi * 1.1) add('v-bad','✕','Price looks high', ` For this equipment, the market range is about ${short(lo)} – ${short(hi)}. Ask for an itemised quote and compare 2–3 installers.`);
+      else if (qp > hi) add('v-warn','!','Price on the high side', ` Fair range is about ${short(lo)} – ${short(hi)}. Could be fine for a premium battery brand. Ask which one.`);
+      else if (qp < lo * 0.8) add('v-bad','✕','Suspiciously cheap', ` Fair range is about ${short(lo)} – ${short(hi)}. Very low prices often mean a used or fake battery, or panels below the stated wattage.`);
+      else if (qp < lo) add('v-warn','!','Cheaper than usual', ` Fair range is about ${short(lo)} – ${short(hi)}. Confirm the battery is new and the brand is genuine.`);
+      else add('v-ok','✓','Price is in the fair range', ` Market range for this equipment is about ${short(lo)} – ${short(hi)}.`);
+    } else add('v-warn','!','Can\'t judge the price yet', ' Fill in the inverter, battery and panels so the price can be compared.');
+  }
+  $('asksBox').hidden = false;
+  renderSheet();
+};
+
+/* ---------- payback ---------- */
+function payback(){ paybackCore(); renderSheet(); }
+function paybackCore(){
+  const s = window.__plan; window.__pay = null;
+  const church = $('mode').value === 'church';
+  const fuel = num($('genL').value) * num($('fuelP').value) * (church ? 4.33 : 30);
+  const service = num($('genL').value) > 0 ? 15000 : 0;
+  const grid = num($('gridM').value);
+  const now = fuel + service + grid;
+  $('pNow').textContent = naira(now); window.__pay = {now};
+  const ch = $('chart'); ch.textContent = '';
+  if (!s || !s.total || !items.length){ $('pBack').textContent = '–'; $('pBackD').textContent = ''; return; }
+  const saving = fuel + service + grid * 0.7;
+  const solarMonthly = grid * 0.3 + (s.lith ? 0 : s.batCost / 30); // tubular: replacement every ~30 months
+  const net = now - solarMonthly;
+  if (net <= 0){ $('pBack').textContent = 'Not on savings alone'; $('pBackD').textContent = 'Your current spend is low compared with the system cost.'; return; }
+  const months = s.mid / net;
+  const label = months < 24 ? Math.ceil(months) + ' months' : (months/12).toFixed(1) + ' years';
+  $('pBack').textContent = label; window.__pay = {now, months, net, label};
+  $('pBackD').textContent = 'Saves about ' + naira(net) + ' a month after that';
+  // 5-year cumulative chart
+  const W = 600, H = 220, P = {l:56, r:16, t:16, b:34};
+  const yrs = 5, max = Math.max(now * 12 * yrs, s.mid + solarMonthly * 12 * yrs) * 1.05;
+  const x = m => P.l + (m / (yrs*12)) * (W - P.l - P.r), y = v => H - P.b - (v / max) * (H - P.t - P.b);
+  const ns = 'http://www.w3.org/2000/svg', svg = document.createElementNS(ns,'svg'); svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.setAttribute('role','img');
+  svg.setAttribute('aria-label', `Over 5 years: current way costs ${short(now*60)}, solar costs ${short(s.mid + solarMonthly*60)}.`);
+  const el = (t, a) => { const e = document.createElementNS(ns, t); for (const k in a) e.setAttribute(k, a[k]); svg.append(e); return e; };
+  const step = max > 2e7 ? 5e6 : max > 8e6 ? 2e6 : max > 4e6 ? 1e6 : 5e5;
+  for (let v = 0; v <= max; v += step){ el('line',{x1:P.l,x2:W-P.r,y1:y(v),y2:y(v),stroke:'var(--line)','stroke-width':1}); const t = el('text',{x:P.l-8,y:y(v)+4,'text-anchor':'end','font-size':12,fill:'var(--muted)','font-family':'var(--mono)'}); t.textContent = short(v).replace('₦0k','0'); }
+  for (let yr = 0; yr <= yrs; yr++){ const t = el('text',{x:x(yr*12),y:H-12,'text-anchor':'middle','font-size':12,fill:'var(--muted)','font-family':'var(--body)'}); t.textContent = yr === 0 ? 'Now' : 'Yr ' + yr; }
+  el('line',{x1:x(0),y1:y(0),x2:x(60),y2:y(now*60),stroke:'var(--bad)','stroke-width':3,'stroke-linecap':'round'});
+  el('line',{x1:x(0),y1:y(s.mid),x2:x(60),y2:y(s.mid+solarMonthly*60),stroke:'var(--leaf)','stroke-width':3,'stroke-linecap':'round'});
+  if (months <= 60){ el('circle',{cx:x(months),cy:y(now*months),r:6,fill:'var(--sun)',stroke:'var(--surface)','stroke-width':2}); }
+  const lab = (txt, X, Y, c, anchor) => { const t = el('text',{x:X,y:Y,'text-anchor':anchor||'end','font-size':13,'font-weight':700,fill:c,'font-family':'var(--body)'}); t.textContent = txt; };
+  lab('Generator + grid ' + short(now*60), W-P.r, y(now*60) - 8, 'var(--bad)');
+  lab('Solar ' + short(s.mid + solarMonthly*60), W-P.r, y(s.mid+solarMonthly*60) + (y(s.mid+solarMonthly*60) - y(now*60) < 22 ? 18 : -8), 'var(--leaf)');
+  ch.append(svg);
+}
+
+/* ---------- plan sheet ---------- */
+const SITE = 'https://tinux723.github.io/solar-planner/';
+const siteUrl = () => /^https?:/.test(location.href) && !/claude\.ai|claudeusercontent/.test(location.host) ? location.href.split('#')[0] : SITE;
+const inFrame = (() => { try { return window.self !== window.top; } catch(e){ return true; } })();
+function summaryText(){
+  const s = window.__plan, pay = window.__pay;
+  if (!s || !items.length || !s.total) return 'Plan your solar system: ' + siteUrl();
+  const L = [];
+  L.push('MY SOLAR PLAN' + (s.church ? ' (church / hall)' : ''));
+  L.push('Energy use: ' + (s.total/1000).toFixed(1) + ' kWh ' + (s.church ? 'per service day, ' + s.days + ' days a week' : 'a day'));
+  L.push('Inverter: ' + s.invLabel + ' hybrid');
+  L.push('Battery: ' + s.batLabel + ' (' + s.batDetail + ')');
+  L.push('Panels: ' + s.panels + ' x 550W (' + (s.panelW/1000).toFixed(2).replace(/0$/,'') + ' kW)');
+  L.push('Fair price, installed: ' + short(s.low) + ' - ' + short(s.high));
+  if (pay && pay.months) L.push('Pays for itself in about ' + pay.label);
+  const v = [...document.querySelectorAll('#verdicts .verdict b')].map(b => b.textContent);
+  if (v.length) L.push('Installer quote check: ' + v.join('; '));
+  L.push(''); L.push('Plan yours: ' + siteUrl());
+  return L.join('\n');
+}
+function renderSheet(){
+  const s = window.__plan, pay = window.__pay, sh = $('sheet'); sh.textContent = '';
+  const E = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
+  const regionTxt = $('region').selectedOptions[0].textContent;
+  sh.append(E('h3', null, s && s.church ? 'Solar Plan: Church / Hall' : 'Solar Plan'));
+  sh.append(E('p', 'meta', new Date().toLocaleDateString('en-NG', {day:'numeric', month:'long', year:'numeric'}) + ' · ' + regionTxt + ' · ' + $('btype').selectedOptions[0].textContent + ' battery'));
+  if (!s || !items.length || !s.total){ sh.append(E('p', null, 'Add appliances above to build your plan.')); $('waBtn').href = 'https://wa.me/?text=' + encodeURIComponent(summaryText()); return; }
+  // appliances
+  sh.append(E('h4', null, s.church ? 'Equipment (per service day)' : 'Appliances (per day)'));
+  const wrap = E('div', 'tbl'), t = E('table'), th = E('thead'), hr = E('tr');
+  [['Item'],['Qty','n'],['Watts','n'],['Day h','n'],['Night h','n'],['kWh','n']].forEach(([h,c]) => hr.append(E('th', c||null, h)));
+  th.append(hr); t.append(th); const tb = E('tbody');
+  items.forEach(it => { const tr = E('tr'); const kwh = it.w*it.q*(it.d+it.ni)*(it.duty||1)/1000;
+    [[it.n],[it.q,'n'],[it.w,'n'],[it.d,'n'],[it.ni,'n'],[kwh.toFixed(2),'n']].forEach(([v,c]) => tr.append(E('td', c||null, String(v)))); tb.append(tr); });
+  t.append(tb); const tf = E('tfoot'), fr = E('tr'); fr.append(E('td', null, 'Total')); for (let i=0;i<4;i++) fr.append(E('td')); fr.append(E('td','n',(s.total/1000).toFixed(1)));
+  tf.append(fr); t.append(tf); wrap.append(t); sh.append(wrap);
+  // system
+  sh.append(E('h4', null, 'Recommended system'));
+  const sys = E('div', 'sys');
+  [['Inverter', s.invLabel, 'Hybrid, pure sine wave'], ['Battery', s.batLabel, s.batDetail], ['Solar panels', s.panels + ' × 550W', (s.panelW/1000).toFixed(2).replace(/0$/,'') + ' kW']].forEach(([k,v,d]) => { const d1 = E('div'); d1.append(E('span', null, k), E('b', null, v), E('small', null, d)); sys.append(d1); });
+  sh.append(sys);
+  sh.append(E('p', 'price', 'Fair price, installed: ' + short(s.low) + ' – ' + short(s.high)));
+  // payback
+  if (pay && pay.now){
+    sh.append(E('h4', null, 'Is it worth it?'));
+    const ul = E('ul'); ul.append(E('li', null, 'Current spend on generator and grid: ' + naira(pay.now) + ' a month'));
+    if (pay.months) ul.append(E('li', null, 'Solar pays for itself in about ' + pay.label + ', then saves about ' + naira(pay.net) + ' a month'));
+    sh.append(ul);
+  }
+  // quote check
+  const vs = [...document.querySelectorAll('#verdicts .verdict')];
+  if (vs.length){
+    sh.append(E('h4', null, 'Installer quote check'));
+    const q = [];
+    if (num($('qInv').value)) q.push($('qInv').value + ' kVA inverter');
+    if (num($('qBat').value)) q.push($('qBtype').value === 'tubular' ? $('qBat').value + ' × 200Ah tubular' : $('qBat').value + ' kWh lithium');
+    if (num($('qPanN').value)) q.push($('qPanN').value + ' × ' + ($('qPanW').value || '?') + 'W panels');
+    if (num($('qPrice').value)) q.push('₦' + $('qPrice').value);
+    if (q.length) sh.append(E('p', null, 'Quote: ' + q.join(', ')));
+    const ul = E('ul'); ul.style.listStyle = 'none'; ul.style.paddingLeft = '0'; vs.forEach(v => { const d = v.querySelector('div'), b = d.querySelector('b'); ul.append(E('li', null, v.querySelector('.dot').textContent + ' ' + b.textContent + ':' + d.textContent.slice(b.textContent.length))); }); sh.append(ul);
+  }
+  // asks
+  sh.append(E('h4', null, 'Ask the installer before you pay'));
+  const ol = E('ol'); ['Battery brand, model and cycle rating (good LiFePO4: 4,000+ cycles)','Proof the battery is new: serial number and warranty card','Panel brand and wattage on the back label','Written warranty for inverter, battery and workmanship','Itemised quote: cables, breakers, surge protection, earthing, mounting, labour'].forEach(a => ol.append(E('li', null, a)));
+  sh.append(ol);
+  sh.append(E('p', 'foot', 'Estimate from Solar Power Planner (' + siteUrl().replace(/^https?:\/\//,'').replace(/\/$/,'') + '), using Lagos market prices from October 2026. Get a site visit before you buy.'));
+  $('waBtn').href = 'https://wa.me/?text=' + encodeURIComponent(summaryText());
+}
+$('printBtn').onclick = () => { renderSheet(); window.print(); };
+if (inFrame) { $('printBtn').hidden = true; }
+$('copyBtn').onclick = async () => {
+  const txt = summaryText();
+  try { await navigator.clipboard.writeText(txt); $('copied').textContent = 'Summary copied. Paste it anywhere.'; }
+  catch(e){ const ta = document.createElement('textarea'); ta.value = txt; document.body.append(ta); ta.select(); try { document.execCommand('copy'); $('copied').textContent = 'Summary copied. Paste it anywhere.'; } catch(_){ $('copied').textContent = 'Couldn\'t copy. Select the text in the sheet instead.'; } ta.remove(); }
+  setTimeout(() => $('copied').textContent = '', 3000);
+};
+
+function applyMode(fromUser){
+  const church = $('mode').value === 'church';
+  $('daysWrap').hidden = !church;
+  $('genLab').textContent = church ? 'Generator fuel per week (litres)' : 'Generator petrol per day (litres)';
+  if (fromUser){
+    if (!$('sampleTag').hidden) { items = sampleFor(church ? 'church' : 'home'); renderList(); }
+    const g = $('genL'), gm = $('gridM');
+    if (church && g.value === '4') g.value = '50'; else if (!church && g.value === '50') g.value = '4';
+    if (church && gm.value === '25000') gm.value = '40000'; else if (!church && gm.value === '40000') gm.value = '25000';
+    save();
+  }
+  renderChips();
+}
+$('mode').addEventListener('change', () => { applyMode(true); compute(); });
+$('days').addEventListener('input', () => { save(); compute(); });
+['region','btype','backup','prPanel','prLith','prTub','prInst'].forEach(id => $(id).addEventListener('input', compute));
+['genL','fuelP','gridM'].forEach(id => $(id).addEventListener('input', payback));
+load(); renderChips(); renderList(); compute();
+})();
+</script>
+
+</body>
+</html>
